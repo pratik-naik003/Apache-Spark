@@ -1729,31 +1729,4 @@ Tasks
 5. [Apache Spark — Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)
 
 ---
-
-## 🔜 Next Module
-
-# Module 03 — RDDs: Resilient Distributed Datasets
-
-We will learn:
-
-```text
-RDD
- ↓
-Creating RDDs
- ↓
-Partitions
- ↓
-Transformations
- ↓
-Actions
- ↓
-Lazy Evaluation
- ↓
-Fault Tolerance
- ↓
-RDD Lineage
- ↓
-Key-Value RDDs
-```
-
-The goal is to understand **how Spark represents and processes distributed data**, before moving deeply into DataFrames and Spark SQL.
+![Description of image](image2.png)
