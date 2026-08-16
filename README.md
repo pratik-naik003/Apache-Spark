@@ -809,28 +809,4 @@ Modern Spark development heavily uses structured APIs such as DataFrames and SQL
 - [Apache Spark History](https://spark.apache.org/history.html)
 
 ---
-
-## 🗺️ What's Next?
-
-### Module 02 — Spark Architecture & Execution Model
-
-In the next module, we will go inside Spark and understand:
-
-```text
-                 Spark Application
-                        |
-                     Driver
-                        |
-                Cluster Manager
-                        |
-             ----------------------
-             |         |          |
-          Worker     Worker     Worker
-             |         |          |
-         Executor  Executor   Executor
-             |         |          |
-           Tasks     Tasks      Tasks
-```
-
-We will understand **Driver, Executor, Worker Node, Cluster Manager, SparkSession, Application, Job, Stage, Task, and how a Spark program actually executes.**
-
+![Description of image](image1.png)
