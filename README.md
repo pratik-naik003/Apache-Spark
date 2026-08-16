@@ -1730,3 +1730,1293 @@ Tasks
 
 ---
 ![Description of image](image2.png)
+
+
+# Apache Spark — Module 03: RDDs (Resilient Distributed Datasets)
+
+![Apache Spark Logo](https://spark.apache.org/images/spark-logo.png)
+
+> **Apache Spark Learning Roadmap — Module 03 of 10**
+>
+> This module covers **RDDs, partitions, transformations, actions, lazy evaluation, immutability, lineage, fault tolerance, persistence, and basic PySpark RDD operations**.
+
+---
+
+## 📚 Table of Contents
+
+- [1. What is an RDD?](#1-what-is-an-rdd)
+- [2. RDD Full Form](#2-rdd-full-form)
+- [3. Why Do We Need RDDs?](#3-why-do-we-need-rdds)
+- [4. RDD and Partitions](#4-rdd-and-partitions)
+- [5. Creating RDDs](#5-creating-rdds)
+- [6. SparkContext](#6-sparkcontext)
+- [7. RDD Immutability](#7-rdd-immutability)
+- [8. Transformations](#8-transformations)
+- [9. Common Transformations](#9-common-transformations)
+- [10. Actions](#10-actions)
+- [11. Transformation vs Action](#11-transformation-vs-action)
+- [12. Lazy Evaluation](#12-lazy-evaluation)
+- [13. RDD Lineage](#13-rdd-lineage)
+- [14. Fault Tolerance](#14-fault-tolerance)
+- [15. RDD Persistence and Caching](#15-rdd-persistence-and-caching)
+- [16. Complete RDD Example](#16-complete-rdd-example)
+- [17. Dry Run](#17-dry-run)
+- [18. RDD Execution Flow](#18-rdd-execution-flow)
+- [19. RDD vs DataFrame](#19-rdd-vs-dataframe)
+- [20. Important RDD Terminology](#20-important-rdd-terminology)
+- [21. Key Takeaways](#21-key-takeaways)
+- [22. Module 03 Checklist](#22-module-03-checklist)
+- [23. References](#23-references)
+
+---
+
+# 1. What is an RDD?
+
+**RDD** stands for **Resilient Distributed Dataset**.
+
+An RDD is Spark's foundational abstraction for a **distributed, immutable, partitioned collection of elements that can be processed in parallel**.
+
+In simple terms:
+
+> An RDD is a collection of data split into partitions so Spark can process those partitions in parallel across a cluster.
+
+The official Spark documentation describes an RDD as a fault-tolerant collection of elements that can be operated on in parallel and is partitioned across cluster nodes.
+
+**Official reference:** [Apache Spark — RDD Programming Guide](https://spark.apache.org/docs/latest/rdd-programming-guide.html)
+
+---
+
+## RDD at a glance
+
+```text
+                         RDD
+                          |
+             +------------+------------+
+             |            |            |
+         Partition 1  Partition 2  Partition 3
+             |            |            |
+           Task         Task         Task
+             |            |            |
+         Executor      Executor      Executor
+```
+
+This connects directly with **Module 02 — Spark Architecture**.
+
+---
+
+# 2. RDD Full Form
+
+Let's break the name down:
+
+## R — Resilient
+
+RDDs are designed to recover from failures.
+
+If a partition is lost, Spark can often recompute it using the transformations that created it.
+
+---
+
+## D — Distributed
+
+The data is divided into partitions and can be processed across multiple machines.
+
+---
+
+## D — Dataset
+
+An RDD represents a collection of elements.
+
+So:
+
+```text
+Resilient
+    +
+Distributed
+    +
+Dataset
+    =
+RDD
+```
+
+---
+
+# 3. Why Do We Need RDDs?
+
+Suppose we have:
+
+```text
+100 GB Dataset
+```
+
+Processing everything as one local collection would be difficult.
+
+Spark can divide the data:
+
+```text
+                  100 GB Dataset
+                        |
+                        v
+              +-------------------+
+              |        RDD        |
+              +-------------------+
+                /    |    |    \
+               /     |    |     \
+             P1      P2   P3      P4
+             |       |    |       |
+           Task    Task  Task    Task
+             |       |    |       |
+         Executor Executor Executor Executor
+```
+
+Each partition can be processed independently when the operation allows it.
+
+This is what makes distributed parallel processing possible.
+
+---
+
+# 4. RDD and Partitions
+
+A **partition** is a logical chunk of an RDD.
+
+For example:
+
+```text
+RDD
+ |
+ +---- Partition 1 → [1, 2]
+ |
+ +---- Partition 2 → [3, 4]
+ |
+ +---- Partition 3 → [5, 6]
+ |
+ +---- Partition 4 → [7, 8]
+```
+
+Spark generally runs **one task per partition** for a stage.
+
+So:
+
+```text
+Partition 1 → Task 1
+Partition 2 → Task 2
+Partition 3 → Task 3
+Partition 4 → Task 4
+```
+
+The number of partitions is therefore important for parallelism.
+
+> The exact partition count depends on how the RDD is created, the input source, and the configuration.
+
+The official RDD guide explains that Spark runs one task for each partition and allows the partition count to be controlled for parallelized collections.
+
+---
+
+## Official Spark Architecture Visual
+
+![Spark Cluster Overview](https://spark.apache.org/docs/latest/img/cluster-overview.png)
+
+This official Spark diagram is useful for connecting **RDD partitions → tasks → executors → worker nodes**.
+
+**Source:** [Apache Spark — Cluster Mode Overview](https://spark.apache.org/docs/latest/cluster-overview.html)
+
+---
+
+# 5. Creating RDDs
+
+There are two fundamental ways to create RDDs.
+
+---
+
+## 5.1 From an Existing Collection
+
+Use `parallelize()`.
+
+```python
+numbers = [1, 2, 3, 4, 5]
+
+rdd = spark.sparkContext.parallelize(numbers)
+```
+
+Conceptually:
+
+```text
+Python List
+    |
+    v
+parallelize()
+    |
+    v
+RDD
+```
+
+You can also specify the number of partitions:
+
+```python
+rdd = spark.sparkContext.parallelize(numbers, 2)
+```
+
+---
+
+## 5.2 From External Storage
+
+For example:
+
+```python
+rdd = spark.sparkContext.textFile("data.txt")
+```
+
+This creates an RDD representing the lines in the file.
+
+```text
+data.txt
+   |
+   v
+textFile()
+   |
+   v
+RDD
+```
+
+Spark's RDD guide documents `textFile()` for creating RDDs from text files and other Hadoop-supported storage systems.
+
+---
+
+# 6. SparkContext
+
+You will often see:
+
+```python
+spark.sparkContext
+```
+
+`SparkContext` is the core entry point associated with Spark's lower-level RDD API.
+
+Example:
+
+```python
+from pyspark.sql import SparkSession
+
+spark = (
+    SparkSession.builder
+    .appName("RDDDemo")
+    .getOrCreate()
+)
+
+sc = spark.sparkContext
+
+rdd = sc.parallelize([1, 2, 3, 4])
+```
+
+Conceptually:
+
+```text
+SparkSession
+      |
+      v
+SparkContext
+      |
+      v
+RDD API
+```
+
+### Modern PySpark practice
+
+For modern Spark applications, `SparkSession` is generally the primary entry point, while `SparkContext` is still relevant when working directly with RDDs.
+
+---
+
+# 7. RDD Immutability
+
+RDDs are **immutable**.
+
+This means:
+
+> Once an RDD is created, it is not directly modified.
+
+Instead, transformations create new RDDs.
+
+Example:
+
+```python
+numbers = [1, 2, 3, 4]
+
+rdd = spark.sparkContext.parallelize(numbers)
+
+doubled_rdd = rdd.map(lambda x: x * 2)
+```
+
+Conceptually:
+
+```text
+Original RDD
+[1, 2, 3, 4]
+      |
+     map
+      |
+      v
+New RDD
+[2, 4, 6, 8]
+```
+
+The original RDD remains unchanged.
+
+---
+
+## Why immutability is useful
+
+Immutability makes distributed computation easier to reason about because Spark can represent a chain of derived datasets.
+
+```text
+RDD 1
+  |
+  | map
+  v
+RDD 2
+  |
+  | filter
+  v
+RDD 3
+```
+
+This chain becomes important for **lineage and fault recovery**.
+
+---
+
+# 8. Transformations
+
+RDD operations are broadly divided into:
+
+```text
+                  RDD Operations
+                       |
+              +--------+--------+
+              |                 |
+       Transformations       Actions
+```
+
+A **transformation** creates a new RDD from an existing RDD.
+
+Examples:
+
+```python
+map()
+filter()
+flatMap()
+distinct()
+union()
+mapPartitions()
+```
+
+The key point:
+
+> **Transformations are lazy.**
+
+They define what Spark should do, but they do not immediately execute the computation.
+
+---
+
+# 9. Common Transformations
+
+## 9.1 `map()`
+
+`map()` applies a function to every element and returns a new RDD.
+
+```python
+rdd = spark.sparkContext.parallelize([1, 2, 3, 4])
+
+doubled = rdd.map(lambda x: x * 2)
+```
+
+Result:
+
+```text
+[2, 4, 6, 8]
+```
+
+### Mental model
+
+```text
+1 → 2
+2 → 4
+3 → 6
+4 → 8
+```
+
+**One input → one output**
+
+---
+
+## 9.2 `filter()`
+
+`filter()` keeps elements for which the condition is `True`.
+
+```python
+rdd = spark.sparkContext.parallelize([1, 2, 3, 4, 5, 6])
+
+even_numbers = rdd.filter(lambda x: x % 2 == 0)
+```
+
+Result:
+
+```text
+[2, 4, 6]
+```
+
+### Mental model
+
+```text
+1 → ❌
+2 → ✅
+3 → ❌
+4 → ✅
+5 → ❌
+6 → ✅
+```
+
+---
+
+## 9.3 `flatMap()`
+
+`flatMap()` can produce zero or more output elements for each input element.
+
+Example:
+
+```python
+rdd = spark.sparkContext.parallelize([
+    "hello world",
+    "spark is fast"
+])
+
+words = rdd.flatMap(lambda line: line.split())
+```
+
+Result:
+
+```text
+["hello", "world", "spark", "is", "fast"]
+```
+
+### `map()` vs `flatMap()`
+
+```text
+map:
+one input → one output
+
+flatMap:
+one input → zero or more outputs
+```
+
+---
+
+## 9.4 `distinct()`
+
+Removes duplicate elements.
+
+```python
+rdd = spark.sparkContext.parallelize([1, 2, 2, 3, 3, 3])
+
+unique = rdd.distinct()
+```
+
+Result:
+
+```text
+[1, 2, 3]
+```
+
+---
+
+## 9.5 `union()`
+
+Combines two RDDs.
+
+```python
+rdd1 = spark.sparkContext.parallelize([1, 2, 3])
+rdd2 = spark.sparkContext.parallelize([4, 5, 6])
+
+combined = rdd1.union(rdd2)
+```
+
+Result:
+
+```text
+[1, 2, 3, 4, 5, 6]
+```
+
+---
+
+## 9.6 `mapPartitions()`
+
+`mapPartitions()` applies a function to each partition rather than each individual element.
+
+```python
+result = rdd.mapPartitions(my_function)
+```
+
+This can be useful when you want to initialize something once per partition instead of once per record.
+
+---
+
+# 10. Actions
+
+An **action** triggers computation and returns a result to the driver or writes output.
+
+Common actions include:
+
+```python
+collect()
+count()
+first()
+take()
+reduce()
+```
+
+The official Spark RDD guide defines transformations as operations that create new datasets and actions as operations that return a value to the driver after computation.
+
+---
+
+## 10.1 `collect()`
+
+```python
+rdd = spark.sparkContext.parallelize([1, 2, 3, 4])
+
+result = rdd.collect()
+
+print(result)
+```
+
+Output:
+
+```text
+[1, 2, 3, 4]
+```
+
+### ⚠️ Important
+
+`collect()` brings **all elements** to the driver.
+
+Therefore:
+
+```python
+rdd.collect()
+```
+
+can cause driver memory problems if the RDD is very large.
+
+Use it only when the result is reasonably small.
+
+---
+
+## 10.2 `count()`
+
+```python
+rdd.count()
+```
+
+Example:
+
+```python
+rdd = spark.sparkContext.parallelize([10, 20, 30, 40])
+
+print(rdd.count())
+```
+
+Output:
+
+```text
+4
+```
+
+---
+
+## 10.3 `first()`
+
+Returns the first element.
+
+```python
+rdd.first()
+```
+
+---
+
+## 10.4 `take(n)`
+
+Returns the first `n` elements.
+
+```python
+rdd.take(3)
+```
+
+Example result:
+
+```text
+[10, 20, 30]
+```
+
+---
+
+## 10.5 `reduce()`
+
+Combines elements using a function.
+
+```python
+rdd = spark.sparkContext.parallelize([1, 2, 3, 4])
+
+total = rdd.reduce(lambda a, b: a + b)
+
+print(total)
+```
+
+Output:
+
+```text
+10
+```
+
+---
+
+# 11. Transformation vs Action
+
+This distinction is one of the most important concepts in Spark.
+
+| Transformation | Action |
+|---|---|
+| Creates a new RDD | Produces a result / writes output |
+| Lazy | Triggers execution |
+| `map()` | `collect()` |
+| `filter()` | `count()` |
+| `flatMap()` | `first()` |
+| `distinct()` | `take()` |
+| `union()` | `reduce()` |
+
+### Easy memory trick
+
+> **Transformation = "What should Spark do?"**
+
+> **Action = "Now give me the result."**
+
+---
+
+# 12. Lazy Evaluation
+
+Spark uses **lazy evaluation** for transformations.
+
+Suppose:
+
+```python
+rdd = spark.sparkContext.parallelize([1, 2, 3, 4])
+
+doubled = rdd.map(lambda x: x * 2)
+
+filtered = doubled.filter(lambda x: x > 4)
+```
+
+At this point, Spark has recorded the transformations.
+
+```text
+RDD
+ |
+ | map
+ v
+RDD
+ |
+ | filter
+ v
+RDD
+```
+
+The computation is triggered when an action is called:
+
+```python
+filtered.collect()
+```
+
+Then Spark executes the required work.
+
+---
+
+## Why Lazy Evaluation?
+
+Lazy evaluation allows Spark to build a better execution plan and avoid unnecessary intermediate computation.
+
+For example:
+
+```text
+Read
+ ↓
+Map
+ ↓
+Filter
+ ↓
+Reduce
+```
+
+Instead of immediately materializing every intermediate dataset, Spark can reason about the sequence of operations and execute the required computation when an action needs the result.
+
+---
+
+## Complete Lazy Evaluation Flow
+
+```text
+Transformation
+      ↓
+Transformation
+      ↓
+Transformation
+      ↓
+      ...
+      ↓
+    Action
+      ↓
+Spark executes computation
+```
+
+The official RDD programming guide explicitly describes Spark transformations as lazy and explains that they are computed when an action requires a result.
+
+---
+
+# 13. RDD Lineage
+
+**Lineage** is the chain of transformations used to create an RDD.
+
+Example:
+
+```python
+rdd1 = sc.parallelize([1, 2, 3, 4])
+
+rdd2 = rdd1.map(lambda x: x * 2)
+
+rdd3 = rdd2.filter(lambda x: x > 4)
+```
+
+Lineage:
+
+```text
+RDD 1
+ |
+ | map
+ v
+RDD 2
+ |
+ | filter
+ v
+RDD 3
+```
+
+Spark keeps track of the dependencies between RDDs.
+
+---
+
+## Why is lineage important?
+
+Lineage helps Spark recover lost partitions.
+
+Suppose:
+
+```text
+RDD
+ |
+ +---- P1
+ |
+ +---- P2  ❌ Lost
+ |
+ +---- P3
+```
+
+Spark can use the lineage of the RDD to determine how to recompute the lost partition.
+
+```text
+Original Data
+     ↓
+Transformation 1
+     ↓
+Transformation 2
+     ↓
+Recompute Lost Partition
+```
+
+This is an important part of RDD fault tolerance.
+
+---
+
+# 14. Fault Tolerance
+
+**Fault tolerance** means Spark can continue or recover from certain failures instead of losing the entire computation.
+
+RDDs support fault recovery through their lineage.
+
+Example:
+
+```text
+                 RDD
+                  |
+        +---------+---------+
+        |         |         |
+       P1        P2        P3
+                 ❌
+              Lost!
+                 |
+                 v
+          Recompute P2
+          using lineage
+```
+
+This is one reason RDDs are called **Resilient** Distributed Datasets.
+
+The official Spark documentation notes that RDDs automatically recover from node failures and can recompute lost partitions using their transformation history.
+
+---
+
+# 15. RDD Persistence and Caching
+
+Suppose we use an RDD multiple times:
+
+```python
+result1 = rdd.filter(...)
+result2 = rdd.map(...)
+result3 = rdd.reduce(...)
+```
+
+Without persistence, Spark may need to recompute upstream RDDs for separate actions.
+
+If an RDD is reused, we can persist it:
+
+```python
+rdd.cache()
+```
+
+or:
+
+```python
+rdd.persist()
+```
+
+Example:
+
+```python
+rdd = sc.textFile("large_file.txt")
+
+rdd.cache()
+
+rdd.count()
+rdd.filter(lambda x: "spark" in x).count()
+```
+
+Caching can make repeated use of the same RDD much faster.
+
+---
+
+## `cache()` vs `persist()`
+
+```text
+cache()
+   ↓
+Use the default persistence level
+
+persist()
+   ↓
+Choose a storage level
+```
+
+Example:
+
+```python
+rdd.persist()
+```
+
+The exact storage level can be configured using Spark's storage-level APIs.
+
+---
+
+## Important
+
+Caching is **not automatically beneficial**.
+
+Use it when:
+
+- An RDD is reused
+- Recomputation is expensive
+- There is enough memory/resources
+
+Avoid blindly caching every RDD.
+
+---
+
+# 16. Complete RDD Example
+
+```python
+from pyspark.sql import SparkSession
+
+spark = (
+    SparkSession.builder
+    .appName("RDDExample")
+    .getOrCreate()
+)
+
+sc = spark.sparkContext
+
+numbers = [1, 2, 3, 4, 5, 6]
+
+rdd = sc.parallelize(numbers)
+
+even_numbers = rdd.filter(lambda x: x % 2 == 0)
+
+squared_numbers = even_numbers.map(lambda x: x * x)
+
+result = squared_numbers.collect()
+
+print(result)
+```
+
+### Output
+
+```text
+[4, 16, 36]
+```
+
+---
+
+# 17. Dry Run
+
+Original data:
+
+```text
+[1, 2, 3, 4, 5, 6]
+```
+
+### Step 1 — `parallelize()`
+
+```text
+Python List
+     ↓
+RDD
+```
+
+Conceptually:
+
+```text
+RDD
+ |
+ +--- Partition 1
+ +--- Partition 2
+ +--- Partition 3
+```
+
+---
+
+### Step 2 — `filter()`
+
+Condition:
+
+```python
+x % 2 == 0
+```
+
+Results:
+
+```text
+1 → ❌
+2 → ✅
+3 → ❌
+4 → ✅
+5 → ❌
+6 → ✅
+```
+
+New RDD:
+
+```text
+[2, 4, 6]
+```
+
+---
+
+### Step 3 — `map()`
+
+Condition:
+
+```python
+x * x
+```
+
+Results:
+
+```text
+2 → 4
+4 → 16
+6 → 36
+```
+
+New RDD:
+
+```text
+[4, 16, 36]
+```
+
+---
+
+### Step 4 — `collect()`
+
+`collect()` is an action.
+
+It triggers the computation and returns the result to the driver:
+
+```text
+[4, 16, 36]
+```
+
+---
+
+# 18. RDD Execution Flow
+
+The entire process can be visualized as:
+
+```text
+                 Python List
+                     |
+                     v
+                parallelize()
+                     |
+                     v
+                    RDD
+                     |
+                  filter()
+                     |
+                     v
+                   RDD 2
+                     |
+                   map()
+                     |
+                     v
+                   RDD 3
+                     |
+                 collect()
+                     |
+                     v
+                 Execution
+                     |
+                     v
+                  Result
+```
+
+---
+
+## Distributed View
+
+```text
+                         RDD
+                          |
+             +------------+------------+
+             |            |            |
+          Partition    Partition    Partition
+             1            2            3
+             |            |            |
+           Task         Task         Task
+             |            |            |
+         Executor      Executor      Executor
+             \            |           /
+              \           |          /
+               +----------+---------+
+                          |
+                        Result
+                          |
+                          v
+                        Driver
+```
+
+---
+
+# 19. RDD vs DataFrame
+
+RDDs are fundamental to Spark, but modern Spark applications often prefer **DataFrames** for structured data.
+
+Spark's current documentation describes DataFrames as distributed data organized into named columns and notes that DataFrames benefit from Spark SQL's optimized execution engine.
+
+| Feature | RDD | DataFrame |
+|---|---|---|
+| Abstraction level | Low-level | Higher-level |
+| Data structure | Collection of objects/elements | Named columns and rows |
+| Schema | No fixed schema | Schema |
+| Optimization | Limited compared with DataFrame/Spark SQL | Spark SQL optimizer |
+| Type | Flexible | Structured |
+| Control | More low-level control | More declarative |
+| Typical modern use | Specialized/low-level workloads | Most structured-data processing |
+
+### Important
+
+Don't conclude:
+
+> "RDD is useless."
+
+RDDs are still important for understanding Spark's core execution model and are useful for certain low-level or specialized workloads.
+
+However, for most structured data processing, **DataFrames and Spark SQL are generally preferred**.
+
+---
+
+# 20. Important RDD Terminology
+
+| Term | Meaning |
+|---|---|
+| **RDD** | Resilient Distributed Dataset |
+| **Partition** | Logical chunk of an RDD |
+| **Transformation** | Creates a new RDD |
+| **Action** | Triggers computation and returns/writes a result |
+| **Lazy Evaluation** | Delays transformation execution until needed |
+| **Lineage** | Chain of RDD dependencies/transformations |
+| **Fault Tolerance** | Ability to recover from certain failures |
+| **Immutability** | Existing RDDs are not directly modified |
+| **Cache** | Persist an RDD using the default storage level |
+| **Persist** | Persist an RDD using a chosen storage level |
+| **SparkContext** | Core entry point associated with low-level Spark/RDD operations |
+
+---
+
+# 21. Key Takeaways
+
+### ⭐ 1. RDD is Spark's foundational distributed abstraction
+
+```text
+RDD = Resilient + Distributed + Dataset
+```
+
+### ⭐ 2. RDDs are partitioned
+
+```text
+RDD
+ |
+ +--- P1
+ +--- P2
+ +--- P3
+ +--- P4
+```
+
+### ⭐ 3. Transformations create new RDDs
+
+```text
+RDD → map() → RDD
+```
+
+### ⭐ 4. Actions trigger computation
+
+```text
+RDD → action → execution → result
+```
+
+### ⭐ 5. Transformations are lazy
+
+```text
+map()
+filter()
+   ↓
+No immediate execution
+   ↓
+collect()
+   ↓
+Execution
+```
+
+### ⭐ 6. RDDs are immutable
+
+Transformations create new RDDs instead of modifying existing ones.
+
+### ⭐ 7. Lineage enables fault recovery
+
+Spark can recompute lost partitions from their dependencies.
+
+### ⭐ 8. Partitions enable parallel processing
+
+```text
+Partition → Task → Executor
+```
+
+### ⭐ 9. Cache/Persist can avoid repeated computation
+
+Useful when an RDD is reused.
+
+### ⭐ 10. DataFrames are usually preferred for structured data
+
+RDDs remain important for understanding Spark's foundations and for some specialized workloads.
+
+---
+
+# 22. Module 03 Checklist
+
+- [ ] Understand RDD
+- [ ] Know the full form of RDD
+- [ ] Understand Resilient
+- [ ] Understand Distributed
+- [ ] Understand Dataset
+- [ ] Understand RDD partitions
+- [ ] Create an RDD using `parallelize()`
+- [ ] Create an RDD using `textFile()`
+- [ ] Understand SparkContext
+- [ ] Understand RDD immutability
+- [ ] Understand transformations
+- [ ] Learn `map()`
+- [ ] Learn `filter()`
+- [ ] Learn `flatMap()`
+- [ ] Learn `distinct()`
+- [ ] Learn `union()`
+- [ ] Understand actions
+- [ ] Learn `collect()`
+- [ ] Learn `count()`
+- [ ] Learn `first()`
+- [ ] Learn `take()`
+- [ ] Learn `reduce()`
+- [ ] Understand lazy evaluation
+- [ ] Understand lineage
+- [ ] Understand fault tolerance
+- [ ] Understand `cache()`
+- [ ] Understand `persist()`
+- [ ] Understand RDD vs DataFrame
+
+---
+
+# 23. References
+
+### Official Apache Spark Documentation
+
+1. [RDD Programming Guide — Apache Spark](https://spark.apache.org/docs/latest/rdd-programming-guide.html)
+2. [RDD API — Apache Spark](https://spark.apache.org/docs/latest/api/java/org/apache/spark/rdd/RDD.html)
+3. [Spark Core / RDD API — PySpark](https://spark.apache.org/docs/latest/api/python/reference/pyspark.html)
+4. [Spark SQL, DataFrames and Datasets](https://spark.apache.org/docs/latest/sql-programming-guide.html)
+5. [Spark Cluster Overview](https://spark.apache.org/docs/latest/cluster-overview.html)
+
+---
+
+## 🔜 Next Module
+
+# Module 04 — DataFrames & Datasets
+
+We will move from low-level RDDs to the **modern Spark API**:
+
+```text
+RDD
+ ↓
+Why DataFrames were introduced
+ ↓
+DataFrame creation
+ ↓
+Schema
+ ↓
+Columns
+ ↓
+select()
+ ↓
+filter()
+ ↓
+withColumn()
+ ↓
+groupBy()
+ ↓
+agg()
+ ↓
+DataFrame transformations
+ ↓
+DataFrame actions
+ ↓
+RDD vs DataFrame
+```
+
+> **Core idea:** RDDs teach you how Spark works at a lower level. DataFrames will teach you how Spark is normally used for modern structured-data processing.
