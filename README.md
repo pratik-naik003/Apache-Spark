@@ -2985,3 +2985,870 @@ RDDs remain important for understanding Spark's foundations and for some special
 
 ---
 ![Description of image](image3.png)
+
+# Apache Spark — Module 04: DataFrames & Datasets
+
+![Apache Spark Logo](https://spark.apache.org/images/spark-logo.png)
+
+> **Apache Spark Learning Roadmap — Module 04 of 10**
+>
+> This module introduces **DataFrames and Datasets**, the modern structured-data APIs of Apache Spark.
+
+---
+
+## 📚 Table of Contents
+
+- [1. What is a DataFrame?](#1-what-is-a-dataframe)
+- [2. Why DataFrames?](#2-why-dataframes)
+- [3. RDD vs DataFrame](#3-rdd-vs-dataframe)
+- [4. Creating a DataFrame](#4-creating-a-dataframe)
+- [5. Schema](#5-schema)
+- [6. Viewing Data](#6-viewing-data)
+- [7. Selecting Columns](#7-selecting-columns)
+- [8. Filtering Rows](#8-filtering-rows)
+- [9. Adding Columns](#9-adding-columns)
+- [10. Renaming and Dropping Columns](#10-renaming-and-dropping-columns)
+- [11. Sorting Data](#11-sorting-data)
+- [12. GroupBy and Aggregations](#12-groupby-and-aggregations)
+- [13. Reading Data](#13-reading-data)
+- [14. Writing Data](#14-writing-data)
+- [15. DataFrame Transformations and Actions](#15-dataframe-transformations-and-actions)
+- [16. RDD to DataFrame](#16-rdd-to-dataframe)
+- [17. DataFrame vs Pandas](#17-dataframe-vs-pandas)
+- [18. What is a Dataset?](#18-what-is-a-dataset)
+- [19. Complete Example](#19-complete-example)
+- [20. DataFrame Workflow](#20-dataframe-workflow)
+- [21. Key Takeaways](#21-key-takeaways)
+- [22. Module Checklist](#22-module-checklist)
+- [23. References](#23-references)
+
+---
+
+# 1. What is a DataFrame?
+
+A **DataFrame** is a distributed collection of data organized into **named columns**.
+
+You can think of it as a distributed table:
+
+```text
++---------+-----+----------+
+| name    | age | branch   |
++---------+-----+----------+
+| Rahul   | 20  | AIML     |
+| Amit    | 21  | CSE      |
+| Raj     | 22  | IT       |
++---------+-----+----------+
+```
+
+A Spark DataFrame is similar conceptually to a table in a relational database or a pandas DataFrame, but it is designed for **distributed processing**.
+
+Official documentation:
+
+https://spark.apache.org/docs/latest/sql-programming-guide.html
+
+---
+
+# 2. Why DataFrames?
+
+RDDs are powerful but relatively low-level.
+
+With an RDD, Spark primarily works with collections of objects/elements.
+
+With a DataFrame, Spark knows more about the structure:
+
+```text
+Columns
+Data Types
+Schema
+Expressions
+```
+
+This additional structure allows Spark SQL to optimize many DataFrame operations.
+
+### Mental model
+
+```text
+RDD
+ ↓
+Low-level abstraction
+ ↓
+Objects / elements
+```
+
+versus:
+
+```text
+DataFrame
+ ↓
+Higher-level abstraction
+ ↓
+Rows + Columns + Schema
+ ↓
+Spark SQL optimization
+```
+
+---
+
+# 3. RDD vs DataFrame
+
+| Feature | RDD | DataFrame |
+|---|---|---|
+| Abstraction | Low-level | Higher-level |
+| Structure | Collection of objects | Rows and named columns |
+| Schema | Not inherently structured | Yes |
+| Optimization | More limited | Spark SQL optimization |
+| Control | More low-level control | More declarative |
+| Typical use | Specialized/low-level workloads | Structured data processing |
+| Modern Spark usage | Less common for structured data | Commonly preferred |
+
+### Important
+
+RDDs are **not obsolete**.
+
+They are still useful for understanding Spark's foundations and for some specialized workloads.
+
+But for most structured data processing:
+
+> **DataFrames are generally preferred.**
+
+---
+
+# 4. Creating a DataFrame
+
+```python
+from pyspark.sql import SparkSession
+
+spark = (
+    SparkSession.builder
+    .appName("DataFrameDemo")
+    .getOrCreate()
+)
+
+data = [
+    ("Rahul", 20, "AIML"),
+    ("Amit", 21, "CSE"),
+    ("Raj", 22, "IT")
+]
+
+columns = ["name", "age", "branch"]
+
+df = spark.createDataFrame(data, columns)
+
+df.show()
+```
+
+Output:
+
+```text
++-----+---+------+
+| name|age|branch|
++-----+---+------+
+|Rahul| 20|  AIML|
+| Amit| 21|   CSE|
+|  Raj| 22|    IT|
++-----+---+------+
+```
+
+---
+
+# 5. Schema
+
+A DataFrame has a **schema**, which describes its columns and data types.
+
+```python
+df.printSchema()
+```
+
+Example:
+
+```text
+root
+ |-- name: string (nullable = true)
+ |-- age: long (nullable = true)
+ |-- branch: string (nullable = true)
+```
+
+So Spark understands:
+
+```text
+name   → string
+age    → long
+branch → string
+```
+
+Schema is important because Spark can use structural information when planning and optimizing DataFrame operations.
+
+---
+
+# 6. Viewing Data
+
+## `show()`
+
+```python
+df.show()
+```
+
+By default, `show()` displays up to 20 rows.
+
+You can specify the number:
+
+```python
+df.show(2)
+```
+
+For vertical display:
+
+```python
+df.show(vertical=True)
+```
+
+---
+
+# 7. Selecting Columns
+
+Select one column:
+
+```python
+df.select("name")
+```
+
+Select multiple columns:
+
+```python
+df.select("name", "age")
+```
+
+Conceptually:
+
+```text
+DataFrame
+   |
+   +--- name
+   +--- age
+   +--- branch
+```
+
+---
+
+# 8. Filtering Rows
+
+Use `filter()`:
+
+```python
+df.filter(df.age > 20)
+```
+
+Example result:
+
+```text
++----+---+------+
+|name|age|branch|
++----+---+------+
+|Amit| 21|   CSE|
+| Raj| 22|    IT|
++----+---+------+
+```
+
+You can also use:
+
+```python
+df.where(df.age > 20)
+```
+
+`filter()` and `where()` are commonly interchangeable for this use case.
+
+### Multiple conditions
+
+AND:
+
+```python
+df.filter(
+    (df.age > 20) & (df.branch == "CSE")
+)
+```
+
+OR:
+
+```python
+df.filter(
+    (df.age > 20) | (df.branch == "CSE")
+)
+```
+
+NOT:
+
+```python
+df.filter(~(df.age > 20))
+```
+
+### Important
+
+For PySpark column expressions, use:
+
+```text
+&
+|
+~
+```
+
+instead of Python's:
+
+```text
+and
+or
+not
+```
+
+---
+
+# 9. Adding Columns
+
+Use `withColumn()`.
+
+```python
+from pyspark.sql.functions import lit
+
+df2 = df.withColumn(
+    "country",
+    lit("India")
+)
+```
+
+Result:
+
+```text
++-----+---+------+-------+
+| name|age|branch|country|
++-----+---+------+-------+
+|Rahul| 20|  AIML|  India|
+| Amit| 21|   CSE|  India|
+|  Raj| 22|    IT|  India|
++-----+---+------+-------+
+```
+
+### Calculated column
+
+```python
+df2 = df.withColumn(
+    "age_after_5_years",
+    df.age + 5
+)
+```
+
+---
+
+# 10. Renaming and Dropping Columns
+
+## Rename
+
+Use `withColumnRenamed()`:
+
+```python
+df2 = df.withColumnRenamed(
+    "name",
+    "student_name"
+)
+```
+
+## Drop
+
+Use `drop()`:
+
+```python
+df2 = df.drop("branch")
+```
+
+---
+
+# 11. Sorting Data
+
+Use `orderBy()`.
+
+Ascending:
+
+```python
+df.orderBy("age").show()
+```
+
+Descending:
+
+```python
+df.orderBy(df.age.desc()).show()
+```
+
+Multiple columns:
+
+```python
+df.orderBy(
+    df.branch.asc(),
+    df.age.desc()
+).show()
+```
+
+---
+
+# 12. GroupBy and Aggregations
+
+`groupBy()` is used to group rows.
+
+Example:
+
+```python
+df.groupBy("branch").count().show()
+```
+
+Possible result:
+
+```text
++------+-----+
+|branch|count|
++------+-----+
+|  AIML|    2|
+|   CSE|    2|
++------+-----+
+```
+
+Common aggregation functions:
+
+```text
+count()
+sum()
+avg()
+min()
+max()
+```
+
+Import functions:
+
+```python
+from pyspark.sql.functions import (
+    count,
+    sum,
+    avg,
+    min,
+    max
+)
+```
+
+Example:
+
+```python
+df.select(
+    avg("age").alias("average_age")
+).show()
+```
+
+Group-wise aggregation:
+
+```python
+df.groupBy("branch").agg(
+    avg("age").alias("average_age")
+).show()
+```
+
+---
+
+# 13. Reading Data
+
+DataFrames can be created from many data sources.
+
+## CSV
+
+```python
+df = spark.read.csv(
+    "students.csv",
+    header=True,
+    inferSchema=True
+)
+```
+
+### `header=True`
+
+The first row contains column names.
+
+### `inferSchema=True`
+
+Spark attempts to infer the data types.
+
+---
+
+## JSON
+
+```python
+df = spark.read.json("students.json")
+```
+
+---
+
+## Parquet
+
+```python
+df = spark.read.parquet("students.parquet")
+```
+
+Parquet is especially important in real-world Spark data engineering workflows.
+
+---
+
+# 14. Writing Data
+
+## CSV
+
+```python
+df.write.csv("output/")
+```
+
+## JSON
+
+```python
+df.write.json("output/")
+```
+
+## Parquet
+
+```python
+df.write.parquet("output/")
+```
+
+A Spark write generally produces a directory containing output part files rather than a single local file.
+
+---
+
+# 15. DataFrame Transformations and Actions
+
+DataFrames follow the same broad lazy-execution idea introduced with RDDs.
+
+For example:
+
+```python
+filtered = df.filter(df.age > 20)
+```
+
+This builds a new DataFrame representing the operation.
+
+A result-producing operation such as:
+
+```python
+filtered.show()
+```
+
+causes Spark to execute the required computation.
+
+Conceptually:
+
+```text
+Transformation
+      ↓
+Execution Plan
+      ↓
+Action / Result Request
+      ↓
+Execution
+```
+
+---
+
+# 16. RDD to DataFrame
+
+An RDD can be converted into a DataFrame.
+
+```python
+rdd = spark.sparkContext.parallelize([
+    ("Rahul", 20),
+    ("Amit", 21)
+])
+
+df = rdd.toDF(["name", "age"])
+
+df.show()
+```
+
+Output:
+
+```text
++-----+---+
+| name|age|
++-----+---+
+|Rahul| 20|
+| Amit| 21|
++-----+---+
+```
+
+Conceptually:
+
+```text
+RDD
+ ↓
+toDF()
+ ↓
+DataFrame
+```
+
+---
+
+# 17. DataFrame vs Pandas
+
+Spark DataFrames and pandas DataFrames look similar, but their execution models are different.
+
+### pandas
+
+```text
+Python Process
+      ↓
+Local Memory
+      ↓
+pandas DataFrame
+```
+
+### Spark
+
+```text
+Spark Application
+      ↓
+Cluster
+      ↓
+Partitions
+      ↓
+Executors
+      ↓
+Spark DataFrame
+```
+
+Therefore:
+
+> A Spark DataFrame is designed for distributed processing.
+
+Do not simply memorize:
+
+> pandas = small data, Spark = big data.
+
+The more useful distinction is:
+
+> **pandas is primarily a local DataFrame/data-analysis library, while Spark DataFrames are designed for distributed data processing.**
+
+---
+
+# 18. What is a Dataset?
+
+Spark also has an abstraction called a **Dataset**.
+
+In Spark's JVM APIs:
+
+- `DataFrame` is essentially a `Dataset[Row]`
+- `Dataset` provides a strongly typed API in Scala and Java
+
+### Important for PySpark
+
+Python does **not** provide the same strongly typed Dataset API available in Scala/Java.
+
+Therefore, when learning Spark with Python, your main focus should be:
+
+> **PySpark DataFrames**
+
+You do not need to spend much time on the typed Dataset API at this stage.
+
+---
+
+# 19. Complete Example
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import avg
+
+spark = (
+    SparkSession.builder
+    .appName("StudentAnalysis")
+    .getOrCreate()
+)
+
+data = [
+    ("Rahul", 20, "AIML", 85),
+    ("Amit", 21, "CSE", 78),
+    ("Raj", 22, "AIML", 92),
+    ("Neha", 20, "CSE", 88)
+]
+
+columns = ["name", "age", "branch", "marks"]
+
+df = spark.createDataFrame(data, columns)
+
+# Filter high scorers
+high_scorers = df.filter(df.marks > 80)
+
+high_scorers.show()
+
+# Average marks
+df.select(
+    avg("marks").alias("average_marks")
+).show()
+
+# Branch-wise average
+df.groupBy("branch").agg(
+    avg("marks").alias("average_marks")
+).show()
+```
+
+---
+
+# 20. DataFrame Workflow
+
+A common Spark DataFrame workflow looks like:
+
+```text
+Read Data
+   ↓
+Create DataFrame
+   ↓
+Understand Schema
+   ↓
+Select / Filter
+   ↓
+Transform
+   ↓
+Group / Aggregate
+   ↓
+Sort
+   ↓
+Write Result
+```
+
+Another useful mental model:
+
+```text
+                  DataFrame
+                      |
+       ---------------------------------
+       |               |               |
+    select()         filter()       withColumn()
+       |               |               |
+       +---------------+---------------+
+                       |
+                   groupBy()
+                       |
+                     agg()
+                       |
+                   orderBy()
+                       |
+                 Spark Execution
+                       |
+                   Executors
+                       |
+                     Result
+```
+
+---
+
+# 21. Key Takeaways
+
+### ⭐ 1. DataFrame
+
+A distributed collection of structured data organized into named columns.
+
+### ⭐ 2. Schema
+
+Describes the structure and data types of a DataFrame.
+
+### ⭐ 3. Important operations
+
+```python
+select()
+filter()
+where()
+withColumn()
+withColumnRenamed()
+drop()
+orderBy()
+groupBy()
+agg()
+```
+
+### ⭐ 4. Read data
+
+```python
+spark.read.csv()
+spark.read.json()
+spark.read.parquet()
+```
+
+### ⭐ 5. Write data
+
+```python
+df.write.csv()
+df.write.json()
+df.write.parquet()
+```
+
+### ⭐ 6. DataFrames are usually preferred for structured data
+
+They provide a higher-level API and allow Spark's SQL engine to optimize structured operations.
+
+### ⭐ 7. RDDs are still important
+
+RDDs remain useful for learning Spark fundamentals and certain specialized workloads.
+
+---
+
+# 22. Module Checklist
+
+- [ ] Understand what a DataFrame is
+- [ ] Understand why DataFrames are useful
+- [ ] Understand RDD vs DataFrame
+- [ ] Create a DataFrame
+- [ ] Understand schema
+- [ ] Use `show()`
+- [ ] Use `select()`
+- [ ] Use `filter()` / `where()`
+- [ ] Use multiple filter conditions
+- [ ] Use `withColumn()`
+- [ ] Use `withColumnRenamed()`
+- [ ] Use `drop()`
+- [ ] Use `orderBy()`
+- [ ] Use `groupBy()`
+- [ ] Use aggregation functions
+- [ ] Read CSV, JSON and Parquet
+- [ ] Write CSV, JSON and Parquet
+- [ ] Understand DataFrame lazy evaluation
+- [ ] Convert RDD to DataFrame
+- [ ] Understand DataFrame vs pandas
+- [ ] Understand the Dataset concept
+- [ ] Understand the typical DataFrame workflow
+
+---
+
+# 23. References
+
+### Official Apache Spark Documentation
+
+1. [Spark SQL, DataFrames and Datasets Guide](https://spark.apache.org/docs/latest/sql-programming-guide.html)
+2. [Apache Spark SQL](https://spark.apache.org/sql/)
+3. [PySpark SQL API](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/index.html)
+4. [Spark DataFrame API](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/dataframe.html)
+5. [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
+
+---
+
+## 🔜 Next Module
+
+# Module 05 — Spark SQL
+
+Next we will connect DataFrames with SQL:
+
+```text
+DataFrame
+     ↓
+Temporary View
+     ↓
+Spark SQL
+     ↓
+SELECT
+WHERE
+GROUP BY
+HAVING
+JOIN
+ORDER BY
+     ↓
+Spark SQL Execution Engine
+```
+
+We will learn how to use your existing SQL knowledge directly with Spark.
+`
