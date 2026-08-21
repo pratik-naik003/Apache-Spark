@@ -3852,3 +3852,5 @@ Spark SQL Execution Engine
 
 We will learn how to use your existing SQL knowledge directly with Spark.
 `
+
+![Description of image](image4.png)
